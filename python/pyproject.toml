@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "moc_py"
+version = "0.1.0"
+description = "Python-native readers and plots for observed glacier velocities (ModelObsCompare, Phase 1)"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "h5py>=3.8",
+    "xarray>=2023.1",
+    "matplotlib>=3.7",
+    "pandas>=2.0",
+]
+
+[project.scripts]
+moc-config = "moc_py.config:main"
+
+[project.optional-dependencies]
+interactive = ["ipympl>=0.9", "jupyterlab>=4.0"]
+shapefile = ["geopandas>=0.14", "shapely>=2.0", "pyogrio>=0.7"]
+lazy = ["dask>=2023.1", "rioxarray>=0.15", "zarr>=2.14", "h5netcdf>=1.1", "fsspec>=2023.1"]
+
+[tool.setuptools]
+packages = ["moc_py"]

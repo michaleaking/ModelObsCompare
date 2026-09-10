@@ -1,0 +1,80 @@
+# =====================================================================
+#  ModelObsCompare (moc) — Model vs Observation Glacier Velocity
+#  Comparison Module
+#
+#  Kept deliberately close to the green-ibis .gitignore so the two
+#  repositories behave the same way side by side.
+# =====================================================================
+
+# --- Data & model outputs (large; live outside the repo, see the README) ---
+*.mat
+*.nc
+*.tif
+*.tiff
+*.h5
+*.hdf5
+# ROIs are small, text, and worth versioning — keep them despite *.mat above
+!rois/*.mat
+!python/rois/*.mat
+
+# --- Shapefile archives (Felikson flowlines, Black & Joughin termini) ---
+*.shp
+*.shx
+*.dbf
+*.prj
+*.sbn
+*.sbx
+*.cpg
+
+# --- Generated figures and exports (regenerable from source + scripts) ---
+figs/
+figures/
+outputs/
+results/
+pdfs/
+exported/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+env/
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- MATLAB junk ---
+*.asv
+*.m~
+slprj/
+codegen/
+*.mex*
+
+# --- Local machine configuration ---
+# Data paths live in ~/.config/moc/paths.json (see the README); a local copy
+# checked into the repo would defeat the point of making them configurable.
+moc_paths.json
+paths.json
+.env
+
+# Claude Code per-machine settings (the shared .claude/settings.json is kept)
+**/.claude/settings.local.json
+
+# --- Large scratch model runs ---
+temp_models/
+Models/
+
+# --- OS / editor junk ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp

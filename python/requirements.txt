@@ -1,0 +1,24 @@
+# moc_py Phase 1 dependencies (Python-native obs readers + plots)
+numpy>=1.24
+scipy>=1.10
+h5py>=3.8
+xarray>=2023.1
+matplotlib>=3.7
+pandas>=2.0
+
+# Optional: interactive ROI drawing + running the notebook
+ipympl>=0.9
+jupyterlab>=4.0
+
+# Optional: build flowline inputs from shapefiles (moc_py.flowline_shp)
+geopandas>=0.14
+shapely>=2.0
+pyogrio>=0.7
+
+# Optional: lazy / cloud reads (open_obs_dataarray of remote COGs, zarr, HTTP netCDF)
+# dask>=2023.1        # keeps DataArrays lazy (chunked)
+# rioxarray>=0.15     # COG stacks + CRS (.rio.crs -> epsg)
+# zarr>=2.14          # itslive-style datacubes
+# h5netcdf>=1.1       # lazy open of HDF5/netCDF4 files
+# fsspec>=2023.1      # remote filesystems (already a dep of others)
+# s3fs / aiohttp      # if reading from s3:// or https://
