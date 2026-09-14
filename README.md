@@ -30,75 +30,57 @@ data apply:
 | | MATLAB | Python |
 |---|---|---|
 | location | this folder | [`python/`](python/) |
-| entry point | `setup_moc` | `import moc_py as mp` |
-| naming | `moc_load_obs_netcdf(...)` | `mp.load_obs_netcdf(...)` |
-| model side | reads ISSM `.mat` directly (needs ISSM) | reads a netCDF exported by `moc_export_model.m` |
-| detailed docs | this file | [`python/README.md`](python/README.md) |
+| setup | run `setup_moc` | `import moc_py as mp` |
+| usage example | `moc_load_obs_netcdf(...)` | `mp.load_obs_netcdf(...)` |
+| model side | reads ISSM `.mat` output directly | reads a netCDF exported by `moc_export_model.m` |
 
-Use MATLAB when you are already inside an ISSM session and want the model
-object itself. Use Python for the observation side, for notebooks, and for
-anything you want to run without a MATLAB licence. The model-side Python
-functions read a netCDF that the MATLAB `moc_export_model.m` writes, so a
-typical workflow crosses over once: export in MATLAB, analyse in Python.
+
+Suggested use cases: Use MATLAB when you are already inside an ISSM session 
+and want the model object itself. Use Python for the observation side, for notebooks, 
+and for anything you want to run without a MATLAB license. The model-side Python
+functions can read a netCDF that the MATLAB `moc_export_model.m` writes, so a
+typical workflow may require first an export in MATLAB if native ISSM output (`.mat' files) 
+are unavailable, then subsequent plotting and analyses can finish in Python (if Python is preferred).
 
 Both read the **same configuration file**, so data locations are set once for
 both (see [Configuring data paths](#configuring-data-paths)).
 
-## Relationship to green-ibis
+## This module was originally developed to support work for project green-ibis
 
 [`green-ibis`](../green-ibis) — *Greenland Ice Bed from Ice Surface* — infers
 seasonal-timescale **basal** processes (basal shear stress, effective pressure,
 friction coefficients) from ice-surface observations and ISSM model output.
-Its `utils/` holds the physics: `basal_shear_stress_budd.m`,
-`basal_shear_stress_schoof.m`, `driving_stress.m`,
+Its `utils/` subdirectory works through model physics and parameter selection: 
+`basal_shear_stress_budd.m`,`basal_shear_stress_schoof.m`, `driving_stress.m`,
 `effective_pressure_full_connectivity.m`, and so on.
 
-Those inversions are only as trustworthy as the velocity field underneath them.
-That is where `moc` fits: it is the **validation and diagnostic step** on either
-side of a green-ibis analysis.
 
-```
-   ISSM transient / inversion run
-              |
-              v
-   +----------------------+        +--------------------------------+
-   |  moc  (this repo)    |        |  green-ibis                    |
-   |  does the model      | -----> |  infer basal conditions from   |
-   |  reproduce observed  |  once  |  a velocity field you trust    |
-   |  velocity?           |  it    |  (tau_b, N, C, driving stress) |
-   +----------------------+  does  +--------------------------------+
-        ^                                      |
-        |______________________________________|
-             where it does not, moc localises the
-             misfit in space, time and along-flow
-```
-
-Concretely:
-
-- **Before** a green-ibis inversion, use `moc` to check that the run being
-  inverted actually matches observations over the glacier and period of
-  interest — `moc_spatial_diff` for the map, `moc_compare_timeseries` for a
+- **Getting started** Use `moc` to check that the model run  matches observations over the glacier
+  and period of interest — `moc_spatial_diff` for the map, `moc_compare_timeseries` for a
   point, `moc_plot_flowline` along the trunk.
-- **After**, when an inferred basal field looks surprising, `moc` tells you
-  whether the surprise is real or is inherited from a velocity misfit in that
-  same place.
 - **Shared conventions.** Both use EPSG:3413, metres, decimal years, and ISSM
   `.exp` contours; an ROI saved here can define a green-ibis analysis domain.
   Both also resolve machine-specific paths through environment variables —
-  green-ibis uses `ISSM_DIR`, which `moc` reads too.
+  green-ibis uses `ISSM_DIR`, which `moc` can read as well.
 - **Complementary, not overlapping.** green-ibis `utils/extract_obs_from_model.m`
   pulls the observations *that were used to calibrate* a transient run; `moc`
-  reads the observational products independently, so it can also judge periods
-  and places the calibration never saw.
+  reads the observational products independently, does not necessarily need to be tied to
+  obs. datasets used in during calibration.
 
-The two are separate repositories on purpose — `moc` has no green-ibis
-dependency and vice versa — but they are designed to sit side by side in the
-same parent folder.
 
 ## Installing the Python module (`moc_py`)
 
 `moc_py` is a normal Python package; install it into whichever environment you
 run notebooks and analyses from. From the repository root:
+
+**conda / mamba:**
+
+```bash
+conda create -n moc python=3.11
+conda activate moc
+conda install -c conda-forge numpy scipy h5py xarray matplotlib pandas geopandas shapely pyogrio ipympl jupyterlab
+pip install -e python/
+```
 
 **pixi** (the project convention):
 
@@ -108,15 +90,6 @@ pixi add geopandas shapely pyogrio        # optional: the flowline/shapefile too
 pixi add ipympl jupyterlab                # optional: notebooks + interactive ROIs
 pixi run sync-env                         # keep environment.yml in step for conda users
 pixi run pip install -e python/           # the package itself, editable
-```
-
-**conda / mamba:**
-
-```bash
-conda create -n moc python=3.11
-conda activate moc
-conda install -c conda-forge numpy scipy h5py xarray matplotlib pandas                              geopandas shapely pyogrio ipympl jupyterlab
-pip install -e python/
 ```
 
 **pip only** (geopandas wheels are fine on modern pip):
@@ -172,7 +145,7 @@ Set them up front, or let the prompts happen as you go:
 moc_configure('-set')                              % prompt for anything missing
 moc_configure('obs_netcdf_dir', '/data/velocity')  % this session
 moc_configure('-save')                             % ... and remember it
-moc_configure()                                    % show the table below
+moc_configure()                                    % shows the table below
 ```
 
 ```bash
@@ -366,7 +339,7 @@ ModelObsCompare/
 
 ## First run: smoke test
 
-Before trusting any plots or metrics, run the smoke test. It loads one of each
+Before trusting any plots or metrics, run the compatibility test. It loads one of each
 data type (auto-picking the *smallest* model and netCDF files for speed), prints
 shapes/ranges, and runs targeted orientation checks — no plotting:
 
@@ -411,7 +384,7 @@ moc_plot_timeseries(C,'datetime',true);
 
 See `examples/` for the full walkthroughs.
 
-## Guided tour on the real data
+## Tested example on real velocity data, NW Greenland
 
 `examples/example_sverdrups_workflow.m` runs the toolkit end to end on files
 that are actually in the configured folders. Sverdrups Glacier is the one place
@@ -535,28 +508,8 @@ t = moc_latest_terminus(T, 'line',[c.x c.y]);
 FL = moc_flowline_to_struct(xc, yc, 'name','a045_06', 'spacing',200);
 ```
 
-Notes on the defaults, all overridable:
 
-- `moc_load_flowlines` skips the `*_iterNN.shp` intermediate versions
-  (`'iterations',true` keeps them) and any shapefile without a `flowline`
-  attribute (e.g. `sverdrup_masks.shp`).
-- `moc_load_termini` keeps only `Quality_Fl == 0` traces (`'max_quality',[]`
-  keeps all) and takes a `'trange'` if you want the front position of a given
-  epoch.
-- "Centre" flowline means the one whose downstream end sits closest to the mean
-  of all the downstream ends; pass `'flowline','05'` to choose explicitly.
-- If **no trace crosses the centre line**, the next line out is tried instead,
-  working outwards and alternating sides (`moc_ordered_flowlines`), and the
-  first one a trace does cross is used — so a centre line that happens to fall
-  in a gap between traces no longer sinks the call. `FL.center_flowline` records
-  the centre of the fan, so `FL.flowline` differing from it means a swap
-  happened. Naming `'flowline'` explicitly disables the search.
-- The split uses the **furthest-inland** crossing, so a wiggly terminus leaves
-  no seaward remnant. Only when no trace crosses *any* line of the fan does the
-  call error, unless you pass `'require_terminus',false` (which falls back to
-  the un-split centre line).
-
-Worked example: `examples/example_flowline_from_shapefiles.m` (set
+Tested example: `examples/example_flowline_from_shapefiles.m` (set
 `RUN_MODEL = true` for the model panel). The Python mirror is
 `python/moc_py/flowline_shp.py` — same defaults, same results.
 
@@ -568,8 +521,4 @@ Worked example: `examples/example_flowline_from_shapefiles.m` (set
   functions already on the path.
 - Model files are large (multi-GB). `moc_load_model` extracts only the mesh and
   velocity/geometry it needs; consider `'trange'` to subset transient runs.
-- **Untested against the live data as shipped** — the code was written from the
-  observed file structures and ISSM function signatures. Run the examples and
-  verify the first plots (especially grid orientation from
-  `InterpFromMeshToGrid` and obs band order) before trusting the metrics.
 ```
