@@ -2,17 +2,18 @@
 
 `moc` (**Model vs Observation Glacier Velocity Comparison Module**) compares
 **observed** surface velocities against **modelled** velocities from ISSM
-ice-flow models over the Greenland Ice Sheet.
+over glacier basins of interest on the Greenland Ice Sheet.
 
-It answers one question in several ways: *where, when, and by how much does the
-model disagree with what the satellites saw?*
+This repo includes functionality for point-by-point, along-flow, and 2D 
+comparisons. Tools for quantifying bias and rerunning bias-corrected differences are included, 
+though in early development. 
 
 - **Regions of interest** — draw a box or polygon on a velocity backdrop, or
-  derive one from a glacier-specific netCDF extent. ROIs round-trip to both
-  JSON and ISSM `.exp` contours, so the same region can be handed to a model
-  run.
+  derive one from reading in boundaries from a glacier-specific netCDF file. Generated ROIs 
+  can be formatted as JSON and or ISSM-compatible `.exp` contours, for easy pass-off to model
+  runs if needed.
 - **Time-series comparison** at a coordinate or along a flowline, with bias,
-  RMSE, MAE and correlation over the co-valid times.
+  RMSE, and correlation over common or interpolated-to-common timestamps.
 - **Spatial-difference maps** (model − obs) over an ROI, regridding both fields
   onto a common grid.
 - **Observed variability maps** — how much a pixel's speed swings over a melt
@@ -21,10 +22,10 @@ model disagree with what the satellites saw?*
   flowline of the glacier through it and clip it at the most recently traced
   terminus, ready to compare along.
 
-## Two implementations, one toolkit
+## Both Python and MATLAB implementations included in toolkit
 
-The same capabilities exist in **MATLAB** and in **Python**, deliberately kept
-at parity — same defaults, same conventions, same results on the same data:
+The same capabilities exist in **MATLAB** and in **Python**, same conventions and 
+data apply:
 
 | | MATLAB | Python |
 |---|---|---|
