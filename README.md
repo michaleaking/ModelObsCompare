@@ -187,6 +187,43 @@ The datasets themselves are not in this repository — they are large and
 externally archived. See [Data assumptions](#data-assumptions) for what each
 one has to look like.
 
+## Gotchas
+
+Things that cost real debugging time here, kept because each one *succeeds*
+quietly rather than erroring.
+
+**The two shapefile archives number their glaciers independently.** The
+Felikson flowline files (`glacier0001.shp` … `glacierd216.shp`) and the Black &
+Joughin `Glacier_ID` column are unrelated schemes: `glacier0001`'s flowlines sit
+~36 km from every trace with `Glacier_ID == 1`, and never intersect them. Pair
+flowlines and termini **spatially** — never by id. An id join succeeds and
+silently matches the wrong glaciers, which is hard to spot because both sides
+look populated. `moc_latest_terminus` / `latest_terminus` do this correctly.
+
+**MATLAB's `regexp(..., 'tokens', 'once')` drops the token of a
+non-participating optional group.** So
+
+```matlab
+tok = regexp('glaciera045_iter01', '^glacier([a-z]?\d{3,4})(?:_iter(\d+))?$', ...
+             'tokens', 'once');   % -> {'a045'} only; numel(tok) == 1
+```
+
+returns a *one*-element cell whether or not `_iter01` matched, so an
+`numel(tok) > 1` guard reads every iteration file as iteration 0. That silently
+pulled the `*_iterNN.shp` intermediate flowlines into the ROI and skewed the
+centre-flowline pick. `moc_load_flowlines` parses the filename by hand instead —
+see the comment at `local_parse_name`. Python's `re` is unaffected (the group is
+`None`), which is why only the MATLAB side had the bug.
+
+**Terminus `Quality_Fl` is not a severity scale.** It is 0 or 1, with 1 flagging
+lower-confidence traces. The readers keep only `0` by default; a newest-trace
+search over unfiltered data can land on a flagged one.
+
+**Flowline vertex order is terminus-first.** Point 1 is the downstream end and
+`d = 0` sits at the terminus, increasing inland. `clip_upstream` detects the
+orientation rather than assuming it, but anything that slices these arrays by
+hand should not assume the opposite.
+
 ---
 
 # MATLAB reference
@@ -251,6 +288,17 @@ non-negative bands (`vv`, `ex`, `ey`, `dT`) and `-2e9` on `vx`/`vy`. Without
 that, 15–30% of pixels read as a `-1 m/yr` speed and quietly poison every map,
 difference and variance downstream.
 
+**Observed gridded velocity, straight from NSIDC** (`glacier_reader.py`) — the
+companion reader at `~/jupyter/glacierReader/glacier_reader.py` queries the NASA
+CMR catalog with `grimpfunc`, opens the matching GrIMP COGs lazily with
+`nisardev`, and writes the same kind of subset locally:
+`velocity(time, band, y, x)` over `{vx, vy, vv, ex, ey, ev, dT}`, NaN-only
+no-data, EPSG:3413. It is used when a glacier/period is **not** available
+locally. The band axis is called `band` (not `component`) and its order is the
+nisardev one — `(vx, vy, vv, ex, ey, ev, dT)`, *not* `cfg.obs_bands` — so read
+those files with `moc_py.obs_nsidc.load_nsidc_netcdf`, which labels bands from
+the file itself. See "Reading velocities straight from NSIDC" below.
+
 **Observed flowline files** (`obs_flowline_dir/<glacier>.mat`) — one glacier per
 file: ordered `(x, y)` flowline points, along-line distance `d`, static geometry
 (`zb`, `zthick`), and velocity time series in one of several layouts
@@ -271,6 +319,106 @@ default). Note its `Glacier_ID` is **unrelated** to the flowline collection's
 glacier ids — the two are paired spatially, never by id.
 
 Both are read as-is in `cfg.epsg` (EPSG:3413); nothing is reprojected.
+
+## Reading velocities straight from NSIDC
+
+`moc` compares whatever observations you hand it; it does not fetch them. The
+fetching lives in a separate, self-contained module —
+`~/jupyter/glacierReader/glacier_reader.py`, with its own pixi environment
+(`grimpfunc`, `nisardev`, GDAL pinned to `>=3.12,<3.13`, the pairing verified
+against NSIDC) — and `moc_py.obs_nsidc` is the adapter between the two.
+
+```python
+import glacier_reader as gr          # the glacierReader env
+import moc_py as mp
+from moc_py.obs_nsidc import load_nsidc_netcdf
+
+display(gr.login())                  # NASA Earthdata, once per session
+
+out = gr.glacier_velocity_workflow(   # ROI -> catalog -> download -> verify
+    center=(-183000.0, -2274200.0), dx_m=10000.0,
+    first_date='2018-01-01', last_date='2019-12-31',
+    products=['NSIDC-0725', 'NSIDC-0731'], prefix='Jakobshavn',
+    out_dir='Subsets',
+)
+
+O   = load_nsidc_netcdf(out['files'][0], bands=['vv'])   # -> moc obs Dataset
+roi = mp.roi_from_obs(O, margin=2000)
+M   = mp.load_model('nw_fric1.nc')
+D   = mp.spatial_diff(M, O, roi, time=2019.6)
+mp.plot_diff(D, roi=roi)
+```
+
+### When the ROI is unknown
+
+Leave `center`/`dx_m` out and the Greenland overview map opens instead: the most recent
+**annual velocity mosaic** (read decimated straight from NSIDC — a few seconds, then cached)
+over the standard **BedMachine coastline**, with the 234 named flux gates of King et al. (2020)
+marked. Drag a box; the readout tracks its size, centre and the glacier it covers.
+
+Pass `prefix=None` and the glacier is looked up and offered for confirmation:
+
+```
+Glacier within ROI is jakobshavn (71% of its gate inside the ROI).
+  also nearby: torssukatak, alangordliup
+Press enter to continue with this file name [jakobshavn] or type in name to use to override default:
+```
+
+Enter accepts it; anything typed replaces it (and is cleaned into a file-name-safe form, so
+`Jakobshavn Isbrae` becomes `Jakobshavn_Isbrae`). The files are then
+`jakobshavn_NSIDC-0725.nc` and friends. In a papermill or cron run — anywhere a prompt could
+not be answered — the suggestion is taken silently instead of hanging.
+
+```python
+%matplotlib widget                    # in a notebook: inline figures cannot be dragged
+out = gr.glacier_velocity_workflow(first_date='2018-01-01', prefix=None)
+
+# or step by step, keeping the ROI for moc:
+sel = gr.select_roi_interactive()     # drag a box
+roi = mp.bbox_to_roi(sel.bbox, name=sel.prompt_name())   # -> a moc Roi, saved
+```
+
+The picker works in a script as well as a notebook — it needs an interactive matplotlib
+backend either way. In a notebook that means `%matplotlib widget` (`ipympl`, now in
+`glacierReader/pixi.toml`); in a script any GUI backend does, and `macosx` is already the
+default in that environment, so `select_roi_interactive()` just opens a window, blocks while
+you drag, and returns when you close it. Only a headless backend (`Agg`, SSH with no display)
+rules it out — there, pass the ROI coordinates explicitly.
+
+The glacier lookup ranks a gate the ROI actually covers above one it merely clips, and falls
+back to the nearest gate within 50 km when the box sits just off a terminus, so an ROI placed
+up-glacier still gets a sensible name. The pieces are usable alone:
+`gr.plot_greenland_overview()`, `gr.glaciers_in_roi(bbox)`, `gr.suggest_glacier_name(bbox)`,
+`gr.prompt_glacier_name(bbox)`.
+
+Two local files back this, both overridable by environment variable:
+`King2020_GreenlandGateCoord.mat` (`GLACIER_GATES_FILE`) for the names and `BedMachine_v5.mat`
+(`BEDMACHINE_FILE`) for the outline. If either is missing the map still opens — without the
+coastline, or without naming — rather than failing.
+
+From inside `moc` alone, `mp.fetch_nsidc(center=..., dx_m=..., products=[...])`
+does the same in one call (omit `center`/`dx_m` there too for the picker) — it reuses any netCDF already in
+`cfg.obs_netcdf_dir` and only hits NSIDC for what is missing, then returns
+`{file stem: obs Dataset}`. It imports `glacier_reader` lazily, so moc still
+installs and runs without `grimpfunc`/`nisardev`; only the download needs them.
+
+What the adapter reconciles:
+
+| | `glacier_reader` output | `moc` convention |
+|---|---|---|
+| band axis | `band`, labelled in the file | `component` (else `cfg.obs_bands`) |
+| band order | `vx, vy, vv, ex, ey, ev, dT` | `vv, vx, vy, ex, ey, dT` |
+| extra band | derived `ev` | — |
+| time | CF datetime (`time1`/`time2` bounds kept) | decimal year + `time_dt` |
+| no-data | NaN only, enforced on write and read | NaN, sentinels masked on read |
+| product codes | NSIDC-0481/0646 are per-box, one file each | one grid per Dataset |
+
+Both sides derived the same GrIMP sentinel rules independently (`-2e9` on
+`vx`/`vy`/`dT`, `-1` on the non-negative bands, and `vv = hypot(vx, vy)`
+inheriting its components' gaps rather than surviving as `+2.83e9`), so the
+no-data convention needs no translation — only verification, which
+`glacier_reader.nodata_report` does on write and
+`moc_py.obs_nsidc.normalize_nodata` repeats on read.
 
 ## Directory layout
 

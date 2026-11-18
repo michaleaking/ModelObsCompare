@@ -23,6 +23,10 @@ moc-config = "moc_py.config:main"
 interactive = ["ipympl>=0.9", "jupyterlab>=4.0"]
 shapefile = ["geopandas>=0.14", "shapely>=2.0", "pyogrio>=0.7"]
 lazy = ["dask>=2023.1", "rioxarray>=0.15", "zarr>=2.14", "h5netcdf>=1.1", "fsspec>=2023.1"]
+# Reading GrIMP/NSIDC subsets written by glacier_reader.py. Downloading them
+# additionally needs grimpfunc + nisardev + GDAL; those live in the
+# glacierReader pixi environment, not here.
+nsidc = ["h5netcdf>=1.1", "dask>=2023.1"]
 
 [tool.setuptools]
 packages = ["moc_py"]
