@@ -183,6 +183,13 @@ def load_termini(roi=None, path: str | Path | None = None,
     Returns:
         ``GeoDataFrame`` of terminus ``LineString``s in EPSG:3413, with an added
         ``date`` column (``datetime64``), sorted oldest to newest.
+
+    Note:
+        The ``Glacier_ID`` column is **unrelated** to the flowline collection's
+        glacier ids — ``glacier0001`` sits ~36 km from every trace with
+        ``Glacier_ID == 1``. Pair flowlines and termini spatially
+        (:func:`latest_terminus` does), never by id: joining on it succeeds
+        while silently matching the wrong glaciers.
     """
     import geopandas as gpd
     import pandas as pd

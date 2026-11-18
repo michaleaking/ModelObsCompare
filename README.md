@@ -213,6 +213,43 @@ The datasets themselves are not in this repository — they are large and
 externally archived. See [Data assumptions](#data-assumptions) for what each
 one has to look like.
 
+## Gotchas
+
+Things that cost real debugging time here, kept because each one *succeeds*
+quietly rather than erroring.
+
+**The two shapefile archives number their glaciers independently.** The
+Felikson flowline files (`glacier0001.shp` … `glacierd216.shp`) and the Black &
+Joughin `Glacier_ID` column are unrelated schemes: `glacier0001`'s flowlines sit
+~36 km from every trace with `Glacier_ID == 1`, and never intersect them. Pair
+flowlines and termini **spatially** — never by id. An id join succeeds and
+silently matches the wrong glaciers, which is hard to spot because both sides
+look populated. `moc_latest_terminus` / `latest_terminus` do this correctly.
+
+**MATLAB's `regexp(..., 'tokens', 'once')` drops the token of a
+non-participating optional group.** So
+
+```matlab
+tok = regexp('glaciera045_iter01', '^glacier([a-z]?\d{3,4})(?:_iter(\d+))?$', ...
+             'tokens', 'once');   % -> {'a045'} only; numel(tok) == 1
+```
+
+returns a *one*-element cell whether or not `_iter01` matched, so an
+`numel(tok) > 1` guard reads every iteration file as iteration 0. That silently
+pulled the `*_iterNN.shp` intermediate flowlines into the ROI and skewed the
+centre-flowline pick. `moc_load_flowlines` parses the filename by hand instead —
+see the comment at `local_parse_name`. Python's `re` is unaffected (the group is
+`None`), which is why only the MATLAB side had the bug.
+
+**Terminus `Quality_Fl` is not a severity scale.** It is 0 or 1, with 1 flagging
+lower-confidence traces. The readers keep only `0` by default; a newest-trace
+search over unfiltered data can land on a flagged one.
+
+**Flowline vertex order is terminus-first.** Point 1 is the downstream end and
+`d = 0` sits at the terminus, increasing inland. `clip_upstream` detects the
+orientation rather than assuming it, but anything that slices these arrays by
+hand should not assume the opposite.
+
 ---
 
 # MATLAB reference

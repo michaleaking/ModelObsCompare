@@ -37,14 +37,22 @@ def _pick_first_in(setting: str, patterns):
         patterns: Glob patterns, tried in order.
 
     Returns:
-        A :class:`~pathlib.Path`, or ``None`` if the setting is not configured
-        (the smoke test then reports that rather than prompting).
+        A :class:`~pathlib.Path` to the smallest matching file.
+
+    Raises:
+        MissingPathError: If the setting is not configured. Propagated as-is so
+            the caller reports its "how to set it" message, rather than passing
+            ``None`` down to a reader and surfacing an opaque ``__fspath__``
+            TypeError.
+        FileNotFoundError: If the folder is configured but holds no match.
     """
-    try:
-        directory = CONFIG.get(setting, prompt=False)
-    except MissingPathError:
-        return None
-    return _pick_first(directory, patterns)
+    directory = CONFIG.get(setting, prompt=False)   # never prompts in a test run
+    hit = _pick_first(directory, patterns)
+    if hit is None:
+        raise FileNotFoundError(
+            f"No file matching {' or '.join(patterns)} in {setting} ({directory})"
+        )
+    return hit
 
 
 def main(argv=None) -> int:
@@ -60,9 +68,10 @@ def main(argv=None) -> int:
         print(f"  [{status:4s}] {name:22s} {msg}")
 
     # --- netCDF ---------------------------------------------------------
-    nc = args.nc or _pick_first_in("obs_netcdf_dir", ["*Subset*.nc", "*.nc"])
-    print(f"\n--- OBS netCDF: {nc} ---")
+    print("\n--- OBS netCDF ---")
     try:
+        nc = args.nc or _pick_first_in("obs_netcdf_dir", ["*Subset*.nc", "*.nc"])
+        print(f"  file: {nc}")
         O = load_obs_netcdf(nc, bands=["vv", "vx", "vy"], trange=(2018, 2020))
         ny, nx, nt = O.sizes["y"], O.sizes["x"], O.sizes["time"]
         print(f"  dims y={ny} x={nx} time={nt} | epsg={O.attrs['epsg']}")
@@ -87,11 +96,10 @@ def main(argv=None) -> int:
         rec("obsnc.load", "FAIL", str(e))
 
     # --- flowline -------------------------------------------------------
-    fl = args.fl
-    if fl is None:
-        fl = _pick_first_in("obs_flowline_dir", ["jakobshavn.mat", "*.mat"])
-    print(f"\n--- OBS flowline: {fl} ---")
+    print("\n--- OBS flowline ---")
     try:
+        fl = args.fl or _pick_first_in("obs_flowline_dir", ["jakobshavn.mat", "*.mat"])
+        print(f"  file: {fl}")
         F = load_obs_flowline(fl)
         npts, ntf = F.sizes["point"], F.sizes["time"]
         print(f"  name={F.attrs['name']} source={F.attrs['source']} "

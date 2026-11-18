@@ -3,8 +3,9 @@
 **Model vs Observation Glacier Velocity Comparison Module**, Python
 implementation. The MATLAB implementation lives one folder up; see
 [`../README.md`](../README.md) for the project overview, how `moc` relates to
-the [green-ibis](../../green-ibis) workflows, and the shared path
-configuration.
+the [green-ibis](../../green-ibis) workflows, the shared path configuration, and
+the [Gotchas](../README.md#gotchas) worth reading before you join these datasets
+by hand.
 
 Python-native readers and plots for **observed** glacier velocities, for use in
 Jupyter. This is **Phase 1**: the two observation formats are read natively and
