@@ -17,6 +17,7 @@ directly in Python.
 | Data | Reader | Notes |
 |---|---|---|
 | Obs gridded velocity (`.nc`) | `load_obs_netcdf` | Files are netCDF4 (**HDF5**); read via `h5py` — **no `netCDF4`/`rioxarray` needed** |
+| GrIMP/NSIDC subset (`.nc`) | `load_nsidc_netcdf` | Written by `glacier_reader.py` from the NSIDC catalog; `band` axis in nisardev order — see [NSIDC downloads](#nsidc-downloads) |
 | Obs flowline (`.mat`) | `load_obs_flowline` | MATLAB **v7** files, read via `scipy.io.loadmat` |
 | ISSM model (`.mat`) | *(Phase 2)* | v7.3 MATLAB **class object** — export to netCDF from MATLAB, then read here |
 
@@ -29,7 +30,8 @@ slicing, and plotting for free.
 Required: `numpy scipy h5py xarray matplotlib pandas`. Optional extras —
 `shapefile` (`geopandas shapely pyogrio`) for `moc_py.flowline_shp`,
 `interactive` (`ipympl jupyterlab`) for notebooks and ROI drawing, `lazy`
-(`dask rioxarray zarr ...`) for cloud reads. Everything else imports without them.
+(`dask rioxarray zarr ...`) for cloud reads, `nsidc` (`h5netcdf dask`) to read
+GrIMP/NSIDC subsets. Everything else imports without them.
 
 **pixi** (the project convention):
 
@@ -297,6 +299,9 @@ python/
     util.py            datenum / CF-time -> datetime64 / decimal-year
     obs_netcdf.py      load_obs_netcdf  (h5py -> xarray, robust dim matching)
     obs_flowline.py    load_obs_flowline (scipy -> xarray, source normalising)
+    obs_lazy.py        open_obs_dataarray / to_obs_dataset (lazy + cloud sources)
+    obs_nsidc.py       load_nsidc_netcdf / nsidc_to_obs / fetch_nsidc /
+                       bbox_to_roi (adapter for glacierReader/glacier_reader.py)
     roi.py             Roi, roi_from_obs, roi_mask, save/load, RoiSelector
     flowline_shp.py    flowline_from_roi + steps (Felikson lines x TBlack termini)
     variance.py        velocity_variance (normalised temporal variability maps)
@@ -313,6 +318,7 @@ python/
     test_model_synthetic.py             Phase 2 checks, synthetic mesh
     test_variance_synthetic.py          velocity_variance, synthetic grid
     test_flowline_shp_synthetic.py      flowline_shp, synthetic shapefiles
+    test_nsidc_synthetic.py             obs_nsidc adapter, synthetic NSIDC file
   requirements.txt
 ```
 
@@ -388,3 +394,46 @@ signed change, the `min_count`/`min_speed` guards, and the plots.
 python tests/test_variance_synthetic.py
 ```
 ```
+
+## NSIDC downloads
+
+When a glacier or period is not available locally, the velocities come straight
+from NSIDC via the companion module `~/jupyter/glacierReader/glacier_reader.py`
+(lifted from `matlab_glacier_reader.ipynb`; `grimpfunc` + `nisardev` + GDAL, in
+its own pixi environment). `moc_py.obs_nsidc` adapts its output:
+
+```python
+from moc_py.obs_nsidc import (load_nsidc_netcdf, nsidc_to_obs, fetch_nsidc,
+                              bbox_to_roi)
+
+O = load_nsidc_netcdf('Jakobshavn_NSIDC-0731.nc', bands=['vv'])  # a saved file
+O = nsidc_to_obs(series.subset, bands=['vv'])                    # a live series
+datasets = fetch_nsidc(center=(-183000., -2274200.), dx_m=10000.,
+                       first_date='2018-01-01',
+                       products=['NSIDC-0731'], prefix='Jakobshavn')
+```
+
+`fetch_nsidc` with no `center`/`dx_m` opens the Greenland overview map (annual velocity mosaic
+over the BedMachine coastline, named flux gates marked) so the ROI can be drawn, and with
+`prefix=None` suggests the glacier the ROI covers and asks before using it as the file name.
+`bbox_to_roi(sel.bbox, name=...)` turns the picked box into a moc `Roi` (saved, with an ISSM
+`.exp`, when a name is given). See [the main README](../README.md#when-the-roi-is-unknown).
+
+All three return the schema of `load_obs_netcdf` — one data var per band,
+`(y, x, time)`, decimal-year `time` plus `time_dt`, an `epsg` attr — so
+`roi_from_obs`, `spatial_diff`, `compare_timeseries`, `velocity_variance`,
+`sample_obs_along_flowline` and the plotters take them unchanged.
+
+Why not just `load_obs_netcdf`? These files label the band axis `band` and
+order it the nisardev way, `(vx, vy, vv, ex, ey, ev, dT)`, against moc's
+`CONFIG.obs_bands` order `(vv, vx, vy, ex, ey, dT)`. Both readers now read the
+`band` labels when they are present, so neither mislabels a well-formed file;
+`load_obs_netcdf` *warns* rather than guessing silently when a file has no band
+labels at all. `load_nsidc_netcdf` additionally keeps the NSIDC provenance
+attrs, handles the derived `ev` band, and re-applies the GrIMP sentinel masking
+on read. Checked by `tests/test_nsidc_synthetic.py` (no network or credentials
+needed).
+
+`fetch_nsidc` imports `glacier_reader` lazily and defaults its output directory
+to `CONFIG.obs_netcdf_dir`, so downloads land beside the hand-made subsets and
+are reused on the next call rather than re-downloaded.

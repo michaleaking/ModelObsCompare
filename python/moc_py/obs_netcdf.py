@@ -13,6 +13,7 @@ Mirrors ``io/moc_load_obs_netcdf.m``.
 from __future__ import annotations
 
 import re
+import warnings
 from pathlib import Path
 
 import h5py
@@ -113,14 +114,29 @@ def load_obs_netcdf(
 
 # ---------------------------------------------------------------------------
 def _component_names(h: h5py.File) -> list[str]:
-    """Read the 'component' band labels, falling back to the configured order."""
-    if "component" in h:
-        vals = h["component"][:]
-        out = []
-        for v in np.asarray(vals).ravel():
-            out.append(v.decode() if isinstance(v, (bytes, bytearray)) else str(v))
-        if out:
-            return out
+    """Read the band labels, falling back (loudly) to the configured order.
+
+    Looks for a ``component`` variable first, then ``band`` — the name the
+    GrIMP/NSIDC subsets written by ``glacier_reader.py`` use. The fallback to
+    ``CONFIG.obs_bands`` warns, because guessing the order silently mislabels
+    every band when a file does not use it: the nisardev order is
+    ``(vx, vy, vv, ex, ey, ev, dT)``, not ``(vv, vx, vy, ex, ey, dT)``. For
+    those files use :func:`moc_py.obs_nsidc.load_nsidc_netcdf`.
+    """
+    for key in ("component", "band"):
+        if key in h:
+            out = []
+            for v in np.asarray(h[key][:]).ravel():
+                out.append(v.decode() if isinstance(v, (bytes, bytearray)) else str(v))
+            if out:
+                return out
+    warnings.warn(
+        f'No "component" or "band" labels in {h.filename}; assuming the '
+        f"configured order {tuple(CONFIG.obs_bands)}. If the file is a "
+        "GrIMP/NSIDC subset, read it with moc_py.obs_nsidc.load_nsidc_netcdf "
+        "instead — its band order differs and would be mislabelled here.",
+        stacklevel=3,
+    )
     return list(CONFIG.obs_bands)
 
 

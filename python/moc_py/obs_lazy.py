@@ -31,6 +31,9 @@ from .util import cf_time_to_datetime64, datetime64_to_decyear
 _X_NAMES = ("x", "X", "easting", "xc")
 _Y_NAMES = ("y", "Y", "northing", "yc")
 _T_NAMES = ("time", "mid_date", "t", "date")
+#: Band-axis dimension names: "component" in the Sentinel/CSK subsets,
+#: "band" in the GrIMP/NSIDC products read through nisardev.
+_BAND_DIMS = ("component", "band")
 
 
 def open_obs_dataarray(source, band: str = "vv", varname: str = "velocity",
@@ -156,21 +159,23 @@ def _select_band(obj, band, varname):
             f'Cannot find band "{band}" or var "{varname}" in Dataset with '
             f"vars {list(obj.data_vars)}; pass band=... explicitly."
         )
-    # resolve a component dimension if present
-    if "component" in da.dims:
-        comp = _component_labels(da, obj)
+    # resolve a band axis if present ("component" in the Sentinel/CSK subsets,
+    # "band" in the GrIMP/NSIDC subsets written by glacier_reader.py)
+    band_dim = next((d for d in _BAND_DIMS if d in da.dims), None)
+    if band_dim is not None:
+        comp = _component_labels(da, obj, band_dim)
         if band in comp:
-            da = da.isel(component=comp.index(band))
+            da = da.isel({band_dim: comp.index(band)})
         else:
-            raise KeyError(f'Band "{band}" not in component labels {comp}')
+            raise KeyError(f'Band "{band}" not in {band_dim} labels {comp}')
     return da
 
 
-def _component_labels(da, obj):
-    """Component band names from a coord, else the configured default order."""
+def _component_labels(da, obj, band_dim="component"):
+    """Band names from the band-axis coord, else the configured default order."""
     for src in (da, obj):
-        if "component" in getattr(src, "coords", {}):
-            vals = np.asarray(src["component"].values).ravel()
+        if band_dim in getattr(src, "coords", {}):
+            vals = np.asarray(src[band_dim].values).ravel()
             return [v.decode() if isinstance(v, (bytes, bytearray)) else str(v)
                     for v in vals]
     return list(CONFIG.obs_bands)

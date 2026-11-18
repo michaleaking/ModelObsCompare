@@ -4,6 +4,8 @@ comparing observed vs ISSM-modelled glacier velocities.
 Phase 1 (observations, pure Python):
   - :func:`load_obs_netcdf`   gridded Sentinel/CSK velocity subsets -> xarray
   - :func:`load_obs_flowline` per-glacier flowline .mat files       -> xarray
+  - :func:`load_nsidc_netcdf` / :func:`fetch_nsidc` GrIMP/NSIDC velocity
+    subsets straight from the catalog, via ``glacier_reader.py``
   - ROI tools (:class:`Roi`, :func:`roi_from_obs`, :class:`RoiSelector`, ...)
   - :func:`flowline_from_roi`  Felikson flowline shapefiles cropped to an ROI
     and clipped at the most recent Black & Joughin terminus trace
@@ -35,6 +37,7 @@ from .config import CONFIG, Config, configure, save_config, MissingPathError
 from .obs_flowline import load_obs_flowline
 from .obs_netcdf import load_obs_netcdf
 from .obs_lazy import open_obs_dataarray, to_obs_dataset
+from .obs_nsidc import bbox_to_roi, fetch_nsidc, load_nsidc_netcdf, nsidc_to_obs
 from .roi import Roi, RoiSelector, load_roi, roi_from_obs, roi_mask, save_roi
 from .flowline_shp import (
     roi_polygon, load_flowlines, load_termini, center_flowline, ordered_flowlines,
@@ -58,6 +61,8 @@ __all__ = [
     # obs
     "load_obs_netcdf", "load_obs_flowline",
     "open_obs_dataarray", "to_obs_dataset",
+    # GrIMP/NSIDC downloads from glacier_reader.py (the "nsidc" extra)
+    "load_nsidc_netcdf", "nsidc_to_obs", "fetch_nsidc", "bbox_to_roi",
     # roi
     "Roi", "RoiSelector", "roi_from_obs", "roi_mask", "save_roi", "load_roi",
     # flowlines from shapefiles (needs the "shapefile" extra)
