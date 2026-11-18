@@ -78,3 +78,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# --- Personal scratch space (local runs; never committed) ---
+/scratch/

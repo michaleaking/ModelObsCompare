@@ -1,5 +1,13 @@
 # moc_py — Python side of moc
 
+> **Development has moved to [green-ibis](https://github.com/jabadge/green-ibis/tree/modelObsCompare)**
+> (branch `modelObsCompare`). This repository is archived as the final standalone state of
+> `moc` (November 2026) and is no longer updated. In green-ibis the same code lives under
+> `src/` (`config/`, `data_io/`, `flowline/`, `roi/`, `compare/`, `plotting/`), is imported
+> with `PYTHONPATH=src` (e.g. `from data_io.model_reader import load_model`), and the MATLAB
+> functions drop the `moc_` prefix. Docs: `docs/model_obs_comparison.md`. Please open
+> issues and PRs there.
+
 **Model vs Observation Glacier Velocity Comparison Module**, Python
 implementation. The MATLAB implementation lives one folder up; see
 [`../README.md`](../README.md) for the project overview, how `moc` relates to
